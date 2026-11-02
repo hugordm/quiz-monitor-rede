@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quiz — Monitor de Rede e Presença</title>
+<style>
+  :root {
+    --bg: #0a1628;
+    --surface: #101f38;
+    --surface-2: #16294a;
+    --border: #223357;
+    --text-primary: #e8edf5;
+    --text-secondary: #8c9db3;
+    --good: #2dd4bf;
+    --okay: #fbbf24;
+    --bad: #f87171;
+    --neutral: #4b6087;
+    --fs: clamp(16px, 1.5vw, 26px);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: var(--fs);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  .wrap { width: 100%; max-width: min(900px, 94vw); }
+  .eyebrow { font-size: 0.8em; color: var(--text-secondary); text-align: center; margin-bottom: 4px; }
+  h1 { font-size: 1.5em; font-weight: 700; text-align: center; margin: 0 0 24px; line-height: 1.25; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: clamp(20px, 3vw, 40px);
+  }
+
+  .progress { display: flex; gap: 6px; margin-bottom: 22px; }
+  .progress .seg { height: 5px; flex: 1; background: var(--border); border-radius: 3px; }
+  .progress .seg.filled { background: var(--good); }
+
+  .q-count {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.75em; color: var(--text-secondary); margin-bottom: 10px;
+  }
+  .question { font-size: 1.25em; font-weight: 650; margin-bottom: 22px; line-height: 1.4; }
+
+  .options { display: flex; flex-direction: column; gap: 12px; }
+  .option {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    font: inherit;
+    font-size: 1em;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-primary);
+    transition: border-color 0.2s, background 0.2s;
+    line-height: 1.4;
+  }
+  .option .letter {
+    flex: 0 0 auto;
+    width: 2em; height: 2em;
+    border-radius: 50%;
+    border: 1px solid var(--neutral);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: var(--good);
+  }
+  .option:hover:not(:disabled) { border-color: var(--good); }
+  .option:focus-visible { outline: 2px solid var(--good); outline-offset: 2px; }
+  .option.correct { border-color: var(--good); background: rgba(45,212,191,0.14); }
+  .option.wrong { border-color: var(--bad); background: rgba(248,113,113,0.14); }
+  .option:disabled { cursor: default; color: var(--text-primary); }
+
+  .feedback { margin-top: 18px; font-size: 0.9em; color: var(--text-secondary); line-height: 1.6; display: none; }
+  .feedback.show { display: block; }
+  .feedback strong { color: var(--text-primary); }
+
+  .next-btn {
+    margin-top: 22px; width: 100%; padding: 14px; border-radius: 12px; border: none;
+    background: var(--good); color: #04211d; font: inherit; font-weight: 700; font-size: 1em;
+    cursor: pointer; display: none;
+  }
+  .next-btn.show { display: block; }
+  .next-btn:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 2px; }
+
+  .hint { margin-top: 14px; text-align: center; font-size: 0.7em; color: var(--text-secondary); }
+
+  .result-emoji { font-size: 3em; text-align: center; margin-bottom: 8px; }
+  .result-score {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 2.6em; font-weight: 700; text-align: center; color: var(--good);
+  }
+  .result-msg { text-align: center; color: var(--text-secondary); margin-top: 8px; }
+  .recap {
+    margin-top: 22px; padding: 16px; background: var(--surface-2); border-radius: 12px;
+    font-size: 0.85em; line-height: 1.6; color: var(--text-secondary);
+  }
+  .recap strong { color: var(--text-primary); }
+  .restart-btn {
+    margin-top: 20px; width: 100%; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.9em; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Projeto de extensão</div>
+  <h1>Quiz: Monitor de Rede e Presença da Escola</h1>
+
+  <div class="card">
+    <div id="quizScreen">
+      <div class="progress" id="progress"></div>
+      <div class="q-count" id="qCount"></div>
+      <div class="question" id="questionText"></div>
+      <div class="options" id="optionsBox"></div>
+      <div class="feedback" id="feedback" aria-live="polite"></div>
+      <button class="next-btn" id="nextBtn">Próxima pergunta</button>
+      <div class="hint">Atalhos: teclas A, B, C ou D para responder · Enter ou seta → para avançar</div>
+    </div>
+
+    <div id="resultScreen" style="display:none;">
+      <div class="result-emoji" id="resultEmoji">🎉</div>
+      <div class="result-score" id="resultScore">0/4</div>
+      <div class="result-msg" id="resultMsg"></div>
+      <div class="recap">
+        <strong>Para lembrar:</strong> o ESP32 mede o tempo de resposta da internet e estima os aparelhos por perto →
+        o MQTT leva os dados → o Mosquitto distribui → o Node-RED organiza → o painel mostra e recomenda o que fazer.
+      </div>
+      <button class="restart-btn" id="restartBtn">Jogar de novo</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const LETRAS = ['A', 'B', 'C', 'D'];
+
+  const perguntas = [
+    {
+      texto: "O que o ESP32 faz neste projeto?",
+      opcoes: [
+        "Mede só a temperatura da sala",
+        "Mede o tempo de resposta da internet e estima quantos aparelhos estão por perto",
+        "Controla a velocidade do roteador",
+        "Grava as conversas dos celulares"
+      ],
+      correta: 1,
+      explicacao: "Ele cronometra a resposta da internet (em milissegundos) e escuta os sinais de Wi-Fi no ar para estimar quantos aparelhos existem por perto. Ele não lê o conteúdo de nada."
+    },
+    {
+      texto: "Como os dados chegam do ESP32 até o painel?",
+      opcoes: [
+        "Por um cabo USB ligado ao projetor",
+        "Por Bluetooth",
+        "Pelo MQTT: o ESP32 publica, o Mosquitto distribui e o Node-RED mostra",
+        "Por mensagem de texto (SMS)"
+      ],
+      correta: 2,
+      explicacao: "O MQTT funciona como grupos de WhatsApp para dados. O ESP32 publica em um tópico, o Mosquitto entrega, e o Node-RED recebe e desenha o painel."
+    },
+    {
+      texto: "O que o painel recomenda quando a internet fica ruim em várias leituras seguidas?",
+      opcoes: [
+        "Trocar de notebook",
+        "Desligar o Wi-Fi de vez",
+        "Ignorar, sempre volta ao normal",
+        "Reiniciar o roteador"
+      ],
+      correta: 3,
+      explicacao: "O aviso só aparece depois de 3 leituras ruins seguidas, para evitar alarme falso. Reiniciar o roteador (desligar, esperar uns 10 segundos e ligar) resolve boa parte das lentidões."
+    },
+    {
+      texto: "Por que esse projeto é útil para uma escola e como ele respeita a privacidade?",
+      opcoes: [
+        "Gera dados reais para decidir e cobrar o provedor, guardando só o número de aparelhos e não a identificação deles",
+        "Substitui o técnico de TI e guarda os dados de cada aluno",
+        "É obrigatório por lei",
+        "Deixa a internet mais rápida automaticamente"
+      ],
+      correta: 0,
+      explicacao: "Em vez de \"achismo\", a escola passa a ter um histórico real da qualidade da conexão. E o sistema não guarda nem envia a identificação dos aparelhos, só o número total (LGPD)."
+    }
+  ];
+
+  let atual = 0;
+  let acertos = 0;
+  let respondida = false;
+
+  const el = id => document.getElementById(id);
+
+  function renderProgress() {
+    const box = el('progress');
+    box.innerHTML = '';
+    perguntas.forEach((_, i) => {
+      const seg = document.createElement('div');
+      seg.className = 'seg' + (i < atual ? ' filled' : '');
+      box.appendChild(seg);
+    });
+  }
+
+  function renderPergunta() {
+    respondida = false;
+    renderProgress();
+    const p = perguntas[atual];
+    el('qCount').textContent = `Pergunta ${atual + 1} de ${perguntas.length}`;
+    el('questionText').textContent = p.texto;
+
+    const box = el('optionsBox');
+    box.innerHTML = '';
+    p.opcoes.forEach((opcao, i) => {
+      const btn = document.createElement('button');
+      btn.className = 'option';
+      btn.type = 'button';
+      const letra = document.createElement('span');
+      letra.className = 'letter';
+      letra.textContent = LETRAS[i];
+      const texto = document.createElement('span');
+      texto.textContent = opcao;
+      btn.appendChild(letra);
+      btn.appendChild(texto);
+      btn.addEventListener('click', () => responder(i));
+      box.appendChild(btn);
+    });
+
+    el('feedback').className = 'feedback';
+    el('feedback').textContent = '';
+    el('nextBtn').className = 'next-btn';
+    el('nextBtn').textContent = atual === perguntas.length - 1 ? 'Ver resultado' : 'Próxima pergunta';
+  }
+
+  function responder(escolhida) {
+    if (respondida) return;
+    respondida = true;
+    const p = perguntas[atual];
+    document.querySelectorAll('.option').forEach((btn, i) => {
+      btn.disabled = true;
+      if (i === p.correta) btn.classList.add('correct');
+      else if (i === escolhida) btn.classList.add('wrong');
+    });
+    const acertou = escolhida === p.correta;
+    if (acertou) acertos++;
+
+    const fb = el('feedback');
+    fb.innerHTML = '';
+    const forte = document.createElement('strong');
+    forte.textContent = acertou ? 'Isso mesmo! ' : `Resposta certa: ${LETRAS[p.correta]}. `;
+    fb.appendChild(forte);
+    fb.appendChild(document.createTextNode(p.explicacao));
+    fb.className = 'feedback show';
+    el('nextBtn').className = 'next-btn show';
+  }
+
+  function avancar() {
+    if (!respondida) return;
+    atual++;
+    if (atual < perguntas.length) renderPergunta();
+    else mostrarResultado();
+  }
+
+  function mostrarResultado() {
+    el('quizScreen').style.display = 'none';
+    el('resultScreen').style.display = 'block';
+    el('resultScore').textContent = `${acertos}/${perguntas.length}`;
+    const emoji = el('resultEmoji');
+    const msg = el('resultMsg');
+    if (acertos === perguntas.length) {
+      emoji.textContent = '🏆';
+      msg.textContent = 'Perfeito! Você entendeu tudo sobre o projeto.';
+    } else if (acertos >= perguntas.length / 2) {
+      emoji.textContent = '👏';
+      msg.textContent = 'Muito bem! Você prestou atenção na apresentação.';
+    } else {
+      emoji.textContent = '💡';
+      msg.textContent = 'Vale revisar, mas o importante é ter participado!';
+    }
+  }
+
+  function reiniciar() {
+    atual = 0;
+    acertos = 0;
+    el('resultScreen').style.display = 'none';
+    el('quizScreen').style.display = 'block';
+    renderPergunta();
+  }
+
+  el('nextBtn').addEventListener('click', avancar);
+  el('restartBtn').addEventListener('click', reiniciar);
+
+  document.addEventListener('keydown', e => {
+    if (el('resultScreen').style.display === 'block') {
+      if (e.key === 'Enter') reiniciar();
+      return;
+    }
+    const k = e.key.toLowerCase();
+    const idx = ['a', 'b', 'c', 'd'].indexOf(k);
+    if (idx >= 0 && idx < perguntas[atual].opcoes.length) { responder(idx); return; }
+    if (['1', '2', '3', '4'].includes(k)) { responder(Number(k) - 1); return; }
+    if (e.key === 'ArrowRight' || (e.key === 'Enter' && document.activeElement === document.body)) avancar();
+  });
+
+  renderPergunta();
+</script>
+</body>
+</html>
